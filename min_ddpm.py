@@ -84,7 +84,7 @@ class MinDDPM(nn.Module):
         print("Start sampling ...")
         for t in tqdm.tqdm(reversed(range(1, self.T+1))):
             x, _ = self.reverse_diffusion(x, t)
-            if t % 10 ==0 or t<20:
+            if t % 5 ==0:
                 hist.append(x.detach().cpu().numpy())
         print("Done sampling!")
         

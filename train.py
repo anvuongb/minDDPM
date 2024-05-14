@@ -15,20 +15,20 @@ if __name__ == "__main__":
         "in_dim": 2,
         "out_dim": 2,
         "embed_dim": 128,
-        "num_layers": 3,
+        "num_layers": 4,
         "residual": False,
     }
     model = Model(**model_config)
     total_params = sum([p.numel() for p in model.parameters()])
     print("Model initialized, total params = ", total_params)
 
-    ddpm_config = {"beta1": 1e-4, "beta2": 0.02, "T": 200, "schedule": "linear"}
+    ddpm_config = {"beta1": 1e-3, "beta2": 0.02, "T": 1000, "schedule": "linear"}
     ddpm = MinDDPM(model=model, **ddpm_config)
 
-    train_config = {"lr": 1e-4, "batch_size": 256, "num_epochs": 1000}
+    train_config = {"lr": 1e-4, "batch_size": 256, "num_epochs": 10000}
 
-    # X = make_swiss_roll(5000, 0.1, 0.15)
-    X = make_circles(8000, 0.1, 1)
+    X = make_swiss_roll(10000, 0.1, 0.15)
+    # X = make_circles(10000, 0.1, 1)
     loader = get_data_loader(X, train_config["batch_size"])
 
     opt = torch.optim.Adam(ddpm.parameters(), lr=train_config["lr"])
@@ -51,9 +51,10 @@ if __name__ == "__main__":
                 loss_ema = 0.95 * loss_ema + 0.05 * loss.item()
             pbar.set_description(f"epoch {e} loss: {loss_ema:.4f}")
 
+            torch.nn.utils.clip_grad_norm_(ddpm.parameters(), 1.)
             opt.step()
 
-    exp_name = "circles"
+    exp_name = "swissroll"
     working_dir = os.path.join("static", exp_name)
     if not os.path.exists(working_dir):
         os.makedirs(working_dir)
@@ -75,8 +76,8 @@ if __name__ == "__main__":
         plots = sns.scatterplot(
             x=Xt_history[i][:, 0], y=Xt_history[i][:, 1], s=3, alpha=0.9
         )
-        plots.set_xlim(-20, 20)
-        plots.set_ylim(-20, 20)
+        plots.set_xlim(-15, 15)
+        plots.set_ylim(-15, 15)
         return plots
 
     fig = plt.figure(figsize=(5, 5))
