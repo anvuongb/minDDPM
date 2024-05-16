@@ -18,7 +18,7 @@ if __name__ == "__main__":
     total_params = sum([p.numel() for p in model.parameters()])
     print("Model initialized, total params = ", total_params)
 
-    ddpm_config = {"beta1": 1e-3, "beta2": 0.02, "T": 1000, "schedule": "linear"}
+    ddpm_config = {"beta1": 1e-4, "beta2": 0.02, "T": 1000, "schedule": "linear"}
     ddpm = MinDDPM(model=model, **ddpm_config)
 
     working_dir = "static/swissroll"

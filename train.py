@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import LinearLR
 import numpy as np
 from model import Model
 from min_ddpm import MinDDPM
-from datasets import make_swiss_roll, make_circles, get_data_loader
+from datasets import make_swiss_roll, make_circles, make_dino_dataset, get_data_loader
 import tqdm
 
 if __name__ == "__main__":
@@ -22,13 +22,14 @@ if __name__ == "__main__":
     total_params = sum([p.numel() for p in model.parameters()])
     print("Model initialized, total params = ", total_params)
 
-    ddpm_config = {"beta1": 1e-3, "beta2": 0.02, "T": 1000, "schedule": "linear"}
+    ddpm_config = {"beta1": 1e-4, "beta2": 0.02, "T": 1000, "schedule": "linear"}
     ddpm = MinDDPM(model=model, **ddpm_config)
 
-    train_config = {"lr": 1e-4, "batch_size": 256, "num_epochs": 10000}
+    train_config = {"lr": 1e-3, "batch_size": 256, "num_epochs": 10000}
 
-    X = make_swiss_roll(10000, 0.1, 0.15)
+    # X = make_swiss_roll(10000, 0.1, 0.15)
     # X = make_circles(10000, 0.1, 1)
+    X = make_dino_dataset(10000)
     loader = get_data_loader(X, train_config["batch_size"])
 
     opt = torch.optim.Adam(ddpm.parameters(), lr=train_config["lr"])
@@ -51,10 +52,10 @@ if __name__ == "__main__":
                 loss_ema = 0.95 * loss_ema + 0.05 * loss.item()
             pbar.set_description(f"epoch {e} loss: {loss_ema:.4f}")
 
-            torch.nn.utils.clip_grad_norm_(ddpm.parameters(), 1.)
+            torch.nn.utils.clip_grad_norm_(ddpm.parameters(), 1.0)
             opt.step()
 
-    exp_name = "swissroll"
+    exp_name = "dino"
     working_dir = os.path.join("static", exp_name)
     if not os.path.exists(working_dir):
         os.makedirs(working_dir)
@@ -70,6 +71,7 @@ if __name__ == "__main__":
 
     # save images
     print("Saving images ...")
+
     # create gif of images evolving over time, based on Xt_history
     def animate_diff(i, Xt_history):
         plt.cla()
@@ -78,6 +80,7 @@ if __name__ == "__main__":
         )
         plots.set_xlim(-15, 15)
         plots.set_ylim(-15, 15)
+        plots.set_title(f"time step {i*5}")
         return plots
 
     fig = plt.figure(figsize=(5, 5))

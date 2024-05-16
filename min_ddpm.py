@@ -3,6 +3,7 @@ from torch import nn
 import numpy as np
 import tqdm
 
+
 def get_noise_schedule(
     beta1: float, beta2: float, T: int, schedule: str = "linear"
 ) -> torch.Tensor:
@@ -47,7 +48,10 @@ class MinDDPM(nn.Module):
         self, x: torch.Tensor, t: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         z = torch.randn_like(x)
-        x_t = torch.sqrt(self.alphas_cum[t].view(-1,1)) * x + torch.sqrt(1 - self.alphas_cum[t].view(-1,1)) * z
+        x_t = (
+            torch.sqrt(self.alphas_cum[t].view(-1, 1)) * x
+            + torch.sqrt(1 - self.alphas_cum[t].view(-1, 1)) * z
+        )
         return x_t, z
 
     def reverse_diffusion(
@@ -65,7 +69,7 @@ class MinDDPM(nn.Module):
         x_prev = (
             1
             / torch.sqrt(self.alphas[t])
-            * (x - (1-self.alphas[t]) / torch.sqrt(1-self.alphas_cum[t]) * e)
+            * (x - (1 - self.alphas[t]) / torch.sqrt(1 - self.alphas_cum[t]) * e)
             + torch.sqrt(self.betas[t]) * z
         )
 
@@ -77,15 +81,65 @@ class MinDDPM(nn.Module):
         z_pred = self.model(x_t, t / self.T)
         loss = self.loss(z, z_pred)
         return loss
+    
+    def sample_vector_field_with_start(
+        self, x: torch.Tensor, batch_size: int = 1000
+    ) -> tuple[np.array, list[np.array]]:
+        total = x.shape[0]
+        # slices to batches
+        batches = []
+        for i in range(0, total, batch_size):
+            batches.append(x[i : i + batch_size, :])
+
+        hist = []
+        print("Start sampling ...")
+        for idx, batch in enumerate(batches):
+            pbar = tqdm.tqdm(reversed(range(1, self.T + 1)))
+            hist_ = [batch.detach().cpu().numpy()]
+            pbar.set_description(f"     sampling batch {idx} ")
+            for t in pbar:
+                field, _ = self.reverse_diffusion(batch, t) 
+                if t % 5 == 0:
+                    hist_.append(field.detach().cpu().numpy())
+            hist.append(np.array(hist_))
+        hist = np.concatenate(hist, axis=1)
+        print("Done sampling!")
+
+        return x.detach().cpu().numpy(), hist
+
+    def sample_with_start(
+        self, x: torch.Tensor, batch_size: int = 1000
+    ) -> tuple[np.array, list[np.array]]:
+        total = x.shape[0]
+        # slices to batches
+        batches = []
+        for i in range(0, total, batch_size):
+            batches.append(x[i : i + batch_size, :])
+
+        hist = []
+        print("Start sampling ...")
+        for idx, batch in enumerate(batches):
+            pbar = tqdm.tqdm(reversed(range(1, self.T + 1)))
+            hist_ = [batch.detach().cpu().numpy()]
+            pbar.set_description(f"     sampling batch {idx} ")
+            for t in pbar:
+                batch, _ = self.reverse_diffusion(batch, t) 
+                if t % 5 == 0:
+                    hist_.append(batch.detach().cpu().numpy())
+            hist.append(np.array(hist_))
+        hist = np.concatenate(hist, axis=1)
+        print("Done sampling!")
+
+        return x.detach().cpu().numpy(), hist
 
     def sample(self, shape: torch.Tensor) -> tuple[np.array, list[np.array]]:
         x = torch.randn_like(shape)
         hist = [x.detach().cpu().numpy()]
         print("Start sampling ...")
-        for t in tqdm.tqdm(reversed(range(1, self.T+1))):
+        for t in tqdm.tqdm(reversed(range(1, self.T + 1))):
             x, _ = self.reverse_diffusion(x, t)
-            if t % 5 ==0:
+            if t % 5 == 0:
                 hist.append(x.detach().cpu().numpy())
         print("Done sampling!")
-        
+
         return x.detach().cpu().numpy(), hist
